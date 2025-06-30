@@ -72,5 +72,10 @@ b. pull_request:
 - Triggered when a pull request targets the main branch
 - Only if the pull request includes changes in the terraform/ directory (or its sub-folders)
 15. To trigger the terraform apply which will build the infrastructure, below condition was attached to the step to avoid accidental build, since all changes will be done on the stage branch, until there is a merge to main there wouldn't be any infrastructure build
-![](/img/apply.png)
-16. 
+
+    ![](/img/apply.png)
+
+16. confirm infrastructure build
+![](/img/eks-cluster.png)
+![](/img/node-grps.png)
+![](/img/nodes.png)
