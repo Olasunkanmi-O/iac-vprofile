@@ -1,81 +1,145 @@
-# Terraform code 
+#  Infrastructure as Code – Terraform EKS Deployment
+
+This repository contains the Terraform code used to provision a complete AWS infrastructure for deploying a Kubernetes-based application using **Amazon EKS**.
+
+---
 
 ##  What It Provisions
-- VPC
-- Subnets (public/private)
-- NAT Gateway(s)
-- Route tables
-- Internet Gateway
-- DHCP options
-- Tags
-- EKS Cluster
-- EKS Managed Node Groups
-- Security Groups - Cluster Security Group and Node security Group
+
+This Terraform setup provisions the following AWS resources:
+
+- **VPC**
+- **Public and Private Subnets**
+- **Route Tables**
+- **Internet Gateway**
+- **NAT Gateway**
+- **DHCP Options**
+- **Tags**
+- **EKS Cluster**
+- **EKS Managed Node Groups**
+- **Security Groups**  
+  - Cluster Security Group  
+  - Node Security Group
+
+---
 
 ##  Requirements
-- Terraform CLI v1.x
-- AWS CLI configured with appropriate credentials
-- Backend for remote state (optional)
-- Terraform version 1.6.3
+
+Ensure the following are installed and configured:
+
+- [Terraform CLI](https://developer.hashicorp.com/terraform/downloads) v1.6.3
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+- A backend (e.g., S3) for storing the remote Terraform state
+- A GitHub account for storing your Terraform code and workflows
+
+---
+
+##  Terraform Commands
+
+```bash
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan -out=planfile
+terraform apply -auto-approve -input=false -parallelism=1 planfile
+```
+
+## Repository Setup 
+1.  Create a New Repository
+ - On GitHub, create a new repository for your Terraform code.
+2. Generate an SSH key  
+```bash 
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/<keyname>
+```
+- Add the public key (~/.ssh/<keyname>.pub) to your GitHub SSH keys.
+- Export the private key for Git usage:
+```bash 
+export GIT_SSH_COMMAND="ssh -i ~/.ssh/<keyname>"
+```
+3. clone and configure Git
+```bash
+git clone git@github.com:<your-username>/<your-repo>.git
+cd <your-repo>
+git config core.sshCommand "ssh -i ~/.ssh/<keyname> -F /dev/null"
+``` 
+## AWS IAM Setup
+1. create an IAM user with below accesses, and create access key
+ - `AmazonEC2FullAccess`
+ - `AmazonRoute53FullAccess`
+ - `AmazonS3FullAccess`
+ - `IAMFullAccess`
+ - `AmazonVPCFullAccess`
+ - `AmazonSQSFullAccess`
+ - `AmazonEventBridgeFullAccess`
+
+2. store the access key and secret access key as Github Secrets:
+
+| Secret Name | Description |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID` | IAM user access key ID |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret access key |
+| `BUCKET_TF_STATE` | Name of your S3 bucket for state |
+
+---
+
+## Remote State Backend
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket = "your-bucket-name"
+    key    = "terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+```
 
 
-### Steps
-* terraform init
-* terraform fmt -check
-* terraform validate
-* terraform plan -out planfile
-* terraform apply -auto-approve -input=false -parallelism=1 planfile
+Key terraform files 
+ - [`main.tf`](/terraform/main.tf)
+ - [`vpc.tf`](/terraform/vpc.tf)
+ - [`eks-cluster.tf`](/terraform/eks-cluster.tf)  
+ - [`variables.tf`](/terraform/variables.tf)
+ - [`output.tf`](/terraform/outputs.tf)
 
+## Github Action Workflow
+1. Directory Structure
+- Create a `.github/workflows/` root  directory in the root of your repository.
 
-Prepare the repository
-1. craete a new repository in your github account
-2. create an ssh key in this path on your local machine ```~/.ssh/<keyname>```
-3. copy the public key to the github account and add to ssh key in the github account
-4. export the private key in your local machine 
-
-    ```
-    export GIT_SSH_COMMAND="ssh -i ~/.ssh/<keyname>"
-    ```
-5. make a directory in your local machine where to clone the newly created repo
-6. clone the repo and cd into it.
-7. to ensure the repository always use the SSH key use below command
-    ```bash
-    git config core. sshCommand "ssh -i ~/.ssh/<keyname> -F /dev/null"
-    ```
-8. create an IAM user with below accesses, and create access key
- - AmazonEC2FullAccess
- - AmazonRoute53FullAccess
- - AmazonS3FullAccess
- - IAMFullAccess
- - AmazonVPCFullAccess
- - AmazonSQSFullAccess
- - AmazonEventBridgeFullAccess
-9. copy the access key and secret access key to secrets in github with below variables
- - AWS_ACCESS_KEY_ID
- - AWS_SECRET_ACCESS_KEY
-10. create S3 bucket to be used for terraform state, store your bucket name in github secret as well, variable BUCKET_TF_STATE
-11. write your terraform code, major files are below
- - [main.tf](/terraform/main.tf)
- - [vpc.tf](/terraform/vpc.tf)
- - [eks-cluster.tf](/terraform/eks-cluster.tf)  
-12. create a workflows directory structure at the parent level with the exact name
 ![](/img/folder-structure-iac.png)
-13. create a file (yaml), this is where we will write the workflows. check this [file](.github\workflows\terraform.yml) 
-14. My workflow trigger as shown is defined below
-![](/img/workflow.png)
 
-a. push:
-- Triggered when there is a push (commit or merge) to either: main or stage
-- Only if the changes affect files inside the terraform/ directory (or its sub-folders)
+```yaml
+name: "Terraform Workflow"
 
-b. pull_request:
-- Triggered when a pull request targets the main branch
-- Only if the pull request includes changes in the terraform/ directory (or its sub-folders)
-15. To trigger the terraform apply which will build the infrastructure, below condition was attached to the step to avoid accidental build, since all changes will be done on the stage branch, until there is a merge to main there wouldn't be any infrastructure build
+on:
+  push:
+    branches:
+      - main
+      - stage
+    paths:
+      - terraform/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - terraform/**
 
-    ![](/img/apply.png)
+```
+Push Trigger: Runs when code is pushed to `main` or `stage`, and if files under `terraform/` change.
 
-16. confirm infrastructure build
+Pull Request Trigger: Runs on PRs targeting `main` that affect `terraform/`.
+
+## Safe Deployment Practice
+To prevent accidental infrastructure changes, the `terraform apply` step in your workflow is gated:
+- Only runs after merging changes from `stage` → `main`.
+- Ensures changes are peer-reviewed before affecting real infrastructure.
+
+![](/img/apply.png)
+
+## confirm infrastructure build
 ![](/img/eks-cluster.png)
 ![](/img/node-grps.png)
 ![](/img/nodes.png)
+
+
