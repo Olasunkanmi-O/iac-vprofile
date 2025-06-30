@@ -36,7 +36,7 @@ jobs:
             - name: setup terraform with specified version
               uses: hashicorp/setup-terraform@v3
               with: 
-                terraform_version: 1.6.3
+                terraform_version: 1.12.1
             
             - name: terraform initialization
               id: init
@@ -78,5 +78,5 @@ jobs:
 
             - name: install ingress controller
               if: steps.apply.outcome == 'success'
-              run: kubcetl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.2/deploy/static/provider/aws/deploy.yaml
+              run: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.2/deploy/static/provider/aws/deploy.yaml
                 
