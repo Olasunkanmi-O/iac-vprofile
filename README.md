@@ -5,6 +5,7 @@ This repository contains the Terraform code used to provision a complete AWS inf
 ---
 ## Architectural diagram
 ![](/img/architectural%20setup.png)
+*NB: Please click this [link](https://github.com/Olasunkanmi-O/vprofile-action/raw/main/img/app-deploy.drawio.png) to see the architectural diagram of the detailed action activity of the workflow*
 
 ##  What It Provisions
 
