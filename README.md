@@ -3,6 +3,8 @@
 This repository contains the Terraform code used to provision a complete AWS infrastructure for deploying a Kubernetes-based application using **Amazon EKS**.
 
 ---
+## Architectural diagram
+![](/img/architectural%20setup.png)
 
 ##  What It Provisions
 
