@@ -1,148 +1,93 @@
-#  Infrastructure as Code – Terraform EKS Deployment
+#  VProfile Infrastructure as Code (IaC)
 
-This repository contains the Terraform code used to provision a complete AWS infrastructure for deploying a Kubernetes-based application using **Amazon EKS**.
+[](https://www.google.com/search?q=https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/vprofile-iac.yml)
 
----
+This repository contains the complete Terraform configuration for deploying and managing the **VProfile** application infrastructure on Amazon Web Services (AWS). All infrastructure changes are managed, reviewed, and deployed via a robust **GitHub Actions CI/CD pipeline** (defined in `.github/workflows/vprofile-iac.yml`).
+
 ## Architectural diagram
 ![](/img/architectural%20setup.png)
-*NB: Please click this [link](https://github.com/Olasunkanmi-O/vprofile-action/raw/main/img/app-deploy.drawio.png) to see the architectural diagram of the detailed action activity of the workflow*
 
-##  What It Provisions
+##  Project Overview
 
-This Terraform setup provisions the following AWS resources:
+This IaC setup provisions a fully functioning, secure, and scalable **Kubernetes environment (EKS)**, including the network and compute layers necessary to run the VProfile microservices application.
 
-- **VPC**
-- **Public and Private Subnets**
-- **Route Tables**
-- **Internet Gateway**
-- **NAT Gateway**
-- **DHCP Options**
-- **Tags**
-- **EKS Cluster**
-- **EKS Managed Node Groups**
-- **Security Groups**  
-  - Cluster Security Group  
-  - Node Security Group
+### Major Components Deployed:
 
----
+  * **Networking (VPC):** A dedicated VPC (`vprofile-eks`) spanning three Availability Zones with both public and private subnets.
+  * **Compute:** A high-availability **AWS EKS Cluster** (`vprofile-eks`) running Kubernetes version `1.27`.
+  * **Worker Nodes:** Two separate, EKS-managed node groups configured for redundancy and scaling.
+  * **State Backend:** Secure S3 backend for remote state management and state locking.
 
-##  Requirements
+-----
 
-Ensure the following are installed and configured:
+##  Infrastructure Configuration Details
 
-- [Terraform CLI](https://developer.hashicorp.com/terraform/downloads) v1.6.3
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
-- A backend (e.g., S3) for storing the remote Terraform state
-- A GitHub account for storing your Terraform code and workflows
+### 1\. Networking (`module.vpc`)
 
----
+The networking is provisioned using the official `terraform-aws-modules/vpc/aws` module, establishing a secure network boundary.
 
-##  Terraform Commands
+| Configuration Detail | Value/Description |
+| :--- | :--- |
+| **VPC CIDR** | `172.20.0.0/16` |
+| **Availability** | Utilizes the first **3 Availability Zones** in the region. |
+| **Subnets** | 3 Private Subnets (`172.20.1.0/24`, etc.) and 3 Public Subnets. |
+| **NAT Gateway** | Enabled (`single_nat_gateway = true`), providing outbound-only internet access for all resources in private subnets. |
+| **EKS Tagging** | Tags subnets for automatic discovery by EKS components (Load Balancers, etc.). |
 
-```bash
-terraform init
-terraform fmt -check
-terraform validate
-terraform plan -out=planfile
-terraform apply -auto-approve -input=false -parallelism=1 planfile
-```
+### 2\. EKS Cluster (`module.eks`)
 
-## Repository Setup 
-1.  Create a New Repository
- - On GitHub, create a new repository for your Terraform code.
-2. Generate an SSH key  
-```bash 
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/<keyname>
-```
-- Add the public key (~/.ssh/<keyname>.pub) to your GitHub SSH keys.
-- Export the private key for Git usage:
-```bash 
-export GIT_SSH_COMMAND="ssh -i ~/.ssh/<keyname>"
-```
-3. clone and configure Git
-```bash
-git clone git@github.com:<your-username>/<your-repo>.git
-cd <your-repo>
-git config core.sshCommand "ssh -i ~/.ssh/<keyname> -F /dev/null"
-``` 
-## AWS IAM Setup
-1. create an IAM user with below accesses, and create access key
- - `AmazonEC2FullAccess`
- - `AmazonRoute53FullAccess`
- - `AmazonS3FullAccess`
- - `IAMFullAccess`
- - `AmazonVPCFullAccess`
- - `AmazonSQSFullAccess`
- - `AmazonEventBridgeFullAccess`
+The Kubernetes control plane and worker nodes are managed using the official `terraform-aws-modules/eks/aws` module.
 
-2. store the access key and secret access key as Github Secrets:
+| Configuration Detail | Value/Description |
+| :--- | :--- |
+| **Cluster Name** | `vprofile-eks` (set via `local.cluster_name`) |
+| **Kubernetes Version** | `1.27` |
+| **Access** | `cluster_endpoint_public_access = true` (Public API endpoint enabled). |
+| **VPC Integration** | Cluster control plane is associated with the provisioned VPC and private subnets. |
 
-| Secret Name | Description |
-| --- | --- |
-| `AWS_ACCESS_KEY_ID` | IAM user access key ID |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret access key |
-| `BUCKET_TF_STATE` | Name of your S3 bucket for state |
+#### **EKS Managed Node Groups**
 
----
+The infrastructure includes two separate managed node groups for application redundancy and potential workload separation:
 
-## Remote State Backend
+| Node Group | Instance Type | Min Size | Desired Size | Max Size |
+| :--- | :--- | :--- | :--- | :--- |
+| **`node-group-1` (one)** | `t3.small` | 1 | 2 | 3 |
+| **`node-group-2` (two)** | `t3.small` | 1 | 1 | 2 |
 
-```hcl
-terraform {
-  backend "s3" {
-    bucket = "your-bucket-name"
-    key    = "terraform.tfstate"
-    region = "us-east-1"
-  }
-}
+### 3\. Terraform Backend and Providers
 
-```
+The project enforces version consistency and secure state management:
 
+| Component | Detail |
+| :--- | :--- |
+| **Required Version** | `1.12.1` |
+| **Remote Backend** | **S3** bucket named `probucket-file` in `us-east-1` with state file `terraform.tfstate`. |
+| **Required Providers** | `aws (~> 5.25.0)`, `kubernetes (~> 2.23.0)`, `random`, `tls`, and `cloudinit`. |
 
-Key terraform files 
- - [`main.tf`](/terraform/main.tf)
- - [`vpc.tf`](/terraform/vpc.tf)
- - [`eks-cluster.tf`](/terraform/eks-cluster.tf)  
- - [`variables.tf`](/terraform/variables.tf)
- - [`output.tf`](/terraform/outputs.tf)
+-----
 
-## Github Action Workflow
-1. Directory Structure
-- Create a `.github/workflows/` root  directory in the root of your repository.
+##  CI/CD Pipeline (GitHub Actions)
 
-![](/img/folder-structure-iac.png)
+The core workflow (defined in `.github/workflows/vprofile-iac.yml`) ensures that infrastructure is consistent, auditable, and fully managed through code.
 
-```yaml
-name: "Terraform Workflow"
+### Workflow Triggers
 
-on:
-  push:
-    branches:
-      - main
-      - stage
-    paths:
-      - terraform/**
-  pull_request:
-    branches:
-      - main
-    paths:
-      - terraform/**
+| Event | Branch | Path | Action |
+| :--- | :--- | :--- | :--- |
+| **`push`** | `main`, `stage` | `terraform/**` | Full CI/CD (Plan, Apply for `main`) |
+| **`pull_request`** | `main` | `terraform/**` | **Validation & Plan only** (Safety Review) |
 
-```
-Push Trigger: Runs when code is pushed to `main` or `stage`, and if files under `terraform/` change.
+### Execution Steps
 
-Pull Request Trigger: Runs on PRs targeting `main` that affect `terraform/`.
+1.  **Code Validation:** Runs `fmt -check` and `validate`.
+2.  **Plan:** Executes `terraform plan` on every push/PR to show exact infrastructure changes.
+3.  **Apply (Gated):** Executes `terraform apply -auto-approve` **only on a successful push to the `main` branch.**
+4.  **Post-Deployment Configuration:**
+      * Configures AWS credentials.
+      * Retrieves EKS `kubeconfig`.
+      * Deploys the NGINX Ingress Controller using `kubectl apply`.
 
-## Safe Deployment Practice
-To prevent accidental infrastructure changes, the `terraform apply` step in your workflow is gated:
-- Only runs after merging changes from `stage` → `main`.
-- Ensures changes are peer-reviewed before affecting real infrastructure.
+###  Security & Secrets
 
-![](/img/apply.png)
-
-## confirm infrastructure build
-![](/img/eks-cluster.png)
-![](/img/node-grps.png)
-![](/img/nodes.png)
-
+All AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) and the `BUCKET_TF_STATE` are securely injected into the workflow using **GitHub Repository Secrets**.
 
